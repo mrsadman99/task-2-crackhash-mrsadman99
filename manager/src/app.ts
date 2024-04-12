@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { externalLogger, internalLogger } from './logger.js';
 
 import createTask from './routes/createTask.js';
-import errorHander from './middlewares/errorHander.js';
+import errorHandler from './middlewares/errorHandler.js';
 import express from 'express';
 import getTaskStatus from './routes/getTaskStatus.js';
 import loggerHandler from './middlewares/loggerHandler.js';
@@ -29,13 +29,13 @@ externalApp
     .use(loggerHandler(externalLogger))
     .post(createTaskPath, createTask(createTaskWorkerUrl))
     .get(getTaskStatusPath, getTaskStatus)
-    .use(errorHander(externalLogger));
+    .use(errorHandler(externalLogger));
 
 internalApp
     .use(express.json())
     .use(loggerHandler(internalLogger))
     .patch(updateTaskStatusPath, updateTaskStatus)
-    .use(errorHander(internalLogger));
+    .use(errorHandler(internalLogger));
 
 internalApp.listen(Number(INTERNAL_MANAGER_PORT!), () => { });
 externalApp.listen(Number(EXTERNAL_MANAGER_PORT!), () => { });

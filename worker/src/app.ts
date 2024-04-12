@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 import createTask from './routes/createTask.js';
-import errorHander from './middlewares/errorHander.js';
+import errorHandler from './middlewares/errorHandler.js';
 import express from 'express';
 
 const {
@@ -18,5 +18,5 @@ const workerApi = express();
 workerApi
     .use(express.json())
     .post(createTaskPath, createTask(updateTaskStatusUrl))
-    .use(errorHander)
+    .use(errorHandler)
     .listen(Number(WORKER_PORT!), () => { });

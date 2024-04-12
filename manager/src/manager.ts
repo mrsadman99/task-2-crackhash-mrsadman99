@@ -103,11 +103,7 @@ class Manager implements IManager {
             return false;
         }
 
-        if (result?.status !== 200) {
-            return false;
-        }
-
-        return true;
+        return result?.status === 200;
     }
 }
 

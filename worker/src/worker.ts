@@ -12,7 +12,7 @@ interface IWorker {
         requestId: string,
         hash: string,
         maxLength: number,
-    ): Promise<void>;
+    ): Promise<boolean | void>;
 }
 
 class Worker implements IWorker {
@@ -25,15 +25,15 @@ class Worker implements IWorker {
      * @param hash MD5 hash encoded word
      * @param maxLength maximum amount of symbols in encoded word
      */
-    execute(
+    async execute(
         updateTaskStatusUrl: string,
         partNumber: number,
         partCount: number,
         requestId: string,
         hash: string,
         maxLength: number,
-    ): Promise<void> {
-        return new Promise((resolve) => {
+    ): Promise<boolean | void> {
+        const data = await new Promise((resolve) => {
             const wordsCountByLength = this.getWordsCountByLength(maxLength);
             const alphabetHandler = new AlphabetHandler(wordsCountByLength, maxLength, partCount, partNumber);
             const alphabetIterator = alphabetHandler.getWordsIterator();
@@ -42,14 +42,23 @@ class Worker implements IWorker {
                 const currentHash = createHash('md5').update(word).digest('hex');
 
                 if (currentHash === hash) {
-                    axios.patch(updateTaskStatusUrl, {
-                        requestId,
-                        data: word,
-                    });
-                    resolve();
+                    resolve(word);
                 }
             }
+            resolve(null);
         });
+
+        if (data) {
+            try {
+                const result = await axios.patch(updateTaskStatusUrl, {
+                    requestId,
+                    data,
+                });
+                return result.status === 200;
+            } catch {
+                return false;
+            }
+        }
     }
 
     /**

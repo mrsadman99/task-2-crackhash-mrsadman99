@@ -9,7 +9,7 @@ type CreateTaskRequest = {
 
 export default (createTaskWorkerUrl: string) => async (req: Request<null, CreateTaskResponse, CreateTaskRequest>, res: Response<CreateTaskResponse>, next: NextFunction) => {
     const { body } = req;
-    if (!body || typeof body.hash !== 'string' || typeof body.maxLength !== 'number') {
+    if (!body || !body.hash || !body.maxLength) {
         res.status(400).send('Invalid body format');
     } else {
         const { hash, maxLength } = body;
