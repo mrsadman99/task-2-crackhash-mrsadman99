@@ -1,0 +1,8 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "@stylistic/eslint-plugin-ts": "^1.7.0",
+    "@types/eslint__js": "^8.42.3",
+    "typescript-eslint": "^7.6.0"
+  }
+}
