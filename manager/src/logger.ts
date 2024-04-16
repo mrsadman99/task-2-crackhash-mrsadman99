@@ -1,15 +1,38 @@
-import winston from 'winston';
+import log4js from 'log4js';
 
-const createLogger = (errLogPath: string, infoLogPath: string) => winston.createLogger({
-    level: 'info',
-    format: winston.format.json(),
-    transports: [
-        new winston.transports.File({ filename: errLogPath, level: 'error' }),
-        new winston.transports.File({ filename: infoLogPath }),
-    ],
-});
+const loggerConfig: log4js.Configuration = {
+    appenders: {
+        common: {
+            type: 'file',
+            filename: './logs/manager.log',
+        },
+        internalHttpErrors: {
+            type: 'file',
+            filename: './logs/internal-http-error.log',
+        },
+        internalHttp: {
+            type: 'file',
+            filename: './logs/internal-http.log',
+        },
+        externalHttpErrors: {
+            type: 'file',
+            filename: './logs/external-http-error.log',
+        },
+        externalHttp: {
+            type: 'file',
+            filename: './logs/external-http.log',
+        },
+    },
+    categories: {
+        default: { appenders: ['common'], level: 'debug' },
+        internalHttp: { appenders: ['internalHttp', 'common'], level: 'info' },
+        internalHttpErrors: { appenders: ['internalHttpErrors', 'internalHttp', 'common'], level: 'error' },
+        externalHttp: { appenders: ['externalHttp', 'common'], level: 'info' },
+        externalHttpErrors: { appenders: ['externalHttpErrors', 'externalHttp', 'common'], level: 'error' },
+    },
+};
+const loggerManager = log4js.configure(loggerConfig);
 
-const internalLogger = createLogger('./logs/error-internal.log', './logs/info-internal.log');
-const externalLogger = createLogger('./logs/error-external.log', './logs/info-external.log');
+const logger = loggerManager.getLogger();
 
-export { internalLogger, externalLogger };
+export { loggerManager, logger };

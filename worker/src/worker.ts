@@ -1,18 +1,21 @@
-import AlphabetHandler from './alphabetHandler.js';
+import { AlphabetHandler, WordsGeneratorType } from './alphabetHandler.js';
+import { parentPort, workerData } from 'worker_threads';
 import axios from 'axios';
 import { createHash } from 'crypto';
+import { taskLogger } from './logger.js';
 
-type WordsByLength = { [key: number]: number };
+type WorkerDataType = {
+    updateTaskStatusUrl: string;
+    partNumber: number;
+    partCount: number;
+    requestId: string;
+    hash: string;
+    maxLength: number;
+};
+const workerTypedData: WorkerDataType = workerData;
 
 interface IWorker {
-    execute(
-        updateTaskStatusUrl: string,
-        partNumber: number,
-        partCount: number,
-        requestId: string,
-        hash: string,
-        maxLength: number,
-    ): Promise<boolean | void>;
+    execute(): Promise<boolean>;
 }
 
 class Worker implements IWorker {
@@ -25,69 +28,84 @@ class Worker implements IWorker {
      * @param hash MD5 hash encoded word
      * @param maxLength maximum amount of symbols in encoded word
      */
-    async execute(
-        updateTaskStatusUrl: string,
+    execute(): Promise<boolean> {
+        const {
+            updateTaskStatusUrl,
+            partNumber,
+            partCount,
+            requestId,
+            hash,
+            maxLength,
+        } = workerTypedData;
+        const data = this.crackHash(partNumber, partCount, requestId, hash, maxLength);
+
+        if (data) {
+            return this.sendUpdatedStatus(updateTaskStatusUrl, requestId, data);
+        }
+        return Promise.resolve(false);
+    }
+
+    protected crackHash(
         partNumber: number,
         partCount: number,
         requestId: string,
         hash: string,
-        maxLength: number,
-    ): Promise<boolean | void> {
-        const data = await new Promise((resolve) => {
-            const wordsCountByLength = this.getWordsCountByLength(maxLength);
-            const alphabetHandler = new AlphabetHandler(wordsCountByLength, maxLength, partCount, partNumber);
-            const alphabetIterator = alphabetHandler.getWordsIterator();
+        maxLength: number) {
+        const taskMetadata = {
+            requestId,
+            hash,
+            maxLength,
+            partCount,
+            partNumber,
+        };
+        const wordsGenerator = this.createTask(partCount, partNumber, maxLength, taskMetadata);
 
-            for (const word of alphabetIterator) {
-                const currentHash = createHash('md5').update(word).digest('hex');
-
-                if (currentHash === hash) {
-                    resolve(word);
-                }
+        for (const { word, nextWordsLength } of wordsGenerator) {
+            // Writes log message about iterated to next words length
+            if (nextWordsLength) {
+                const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
+                
+                taskLogger.info(logMessage);
             }
-            resolve(null);
-        });
 
-        if (data) {
-            try {
-                const result = await axios.patch(updateTaskStatusUrl, {
-                    requestId,
-                    data,
-                });
-                return result.status === 200;
-            } catch {
-                return false;
+            const currentHash = createHash('md5').update(word).digest('hex');
+
+            if (currentHash === hash) {
+                const logMessage = `${requestId} Task completed, word: ${word}`;
+                taskLogger.info(logMessage);
+
+                return word;
             }
         }
     }
 
-    /**
-     * Gets map of words count in any combination from alphabet symbols range 1 to i words length,
-     * where i is key of map
-     * @param maxLength
-     * @returns
-     */
-    private getWordsCountByLength(maxLength: number): WordsByLength {
-        const alphabetCount = AlphabetHandler.getAlphabet().length;
-        // Amount of words in combination from 1 to i length words, where i is key of map
-        const wordsCountByLength: WordsByLength = {
-            1: alphabetCount,
-        };
-        for (let i = 2; i <= maxLength; i++) {
-            wordsCountByLength[i] = wordsCountByLength[i - 1] + Math.pow(alphabetCount, i);
-        }
+    protected createTask(
+        partNumber: number,
+        partCount: number, maxLength: number,
+        taskMetadata: { requestId: string },
+    ): Generator<WordsGeneratorType> {
+        // Creates object in async way
+        const alphabetHandler = new AlphabetHandler(maxLength, partCount, partNumber);
+        const alphabetIterator = alphabetHandler.getWordsIterator();
 
-        return wordsCountByLength;
+        taskLogger.addContext('requestId', taskMetadata.requestId);
+        const logMessage = `${taskMetadata.requestId} Created task with following parameters: ${JSON.stringify(taskMetadata, null, 2)}`;
+        taskLogger.info(logMessage);
+
+        return alphabetIterator;
+    }
+
+    protected async sendUpdatedStatus(updateTaskStatusUrl: string, requestId: string, data: string): Promise<boolean> {
+        try {
+            const result = await axios.patch(updateTaskStatusUrl, {
+                requestId,
+                data,
+            });
+            return result.status === 200;
+        } catch {
+            return false;
+        }
     }
 }
 
-let worker: IWorker | null;
-
-const getWorker = (): IWorker => {
-    if (!worker) {
-        worker = new Worker();
-    }
-    return worker;
-};
-
-export { Worker, IWorker, getWorker };
+new Worker().execute().then((result) => parentPort?.postMessage({result}));

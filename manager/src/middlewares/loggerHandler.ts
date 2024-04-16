@@ -1,9 +1,8 @@
 import { NextFunction, Request, Response } from 'express';
-import { Logger } from 'winston';
+import log4js from 'log4js';
 
-export default (logger: Logger) => (req: Request, _: Response, next: NextFunction) => {
-    const date = new Date(Date.now()).toString();
-    let msg = `${req.method} ${req.hostname} ${req.path} ${date}`;
+export default (logger: log4js.Logger) => (req: Request, _: Response, next: NextFunction) => {
+    let msg = `${req.method} ${req.hostname} ${req.path}`;
     if (req.body) {
         msg += ` body: ${JSON.stringify(req.body)}`;
     }

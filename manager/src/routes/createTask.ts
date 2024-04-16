@@ -16,7 +16,7 @@ export default (createTaskWorkerUrl: string) => async (req: Request<null, Create
         try {
             const createTaskResult = await getManager().createTask(createTaskWorkerUrl, hash, maxLength);
             if (!createTaskResult) {
-                throw Error(`Failed to post task: { hash: ${hash}, maxLength: ${maxLength}}`);
+                next(Error(`Failed to post task: { hash: ${hash}, maxLength: ${maxLength}}`));
             } else {
                 const { result, ...taskState } = createTaskResult;
                 if (result === 'EXIST') {

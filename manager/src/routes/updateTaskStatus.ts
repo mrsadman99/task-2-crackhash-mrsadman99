@@ -17,7 +17,7 @@ export default (req: Request<null, null | string, TaskPatchRequest>, res: Respon
             if (result) {
                 res.sendStatus(200);
             } else {
-                throw Error(`Failed to update status for requestId: ${requestId}`);
+                next(Error(`Failed to update status for requestId: ${requestId}`));
             }
         } catch (err) {
             next(err);
