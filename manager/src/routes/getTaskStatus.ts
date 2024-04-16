@@ -10,7 +10,7 @@ export default (req: Request, res: Response, next: NextFunction) => {
         try {
             taskStatus = getManager().getTaskStatus(requestId);
             if (!taskStatus) {
-                throw Error(`Couldn't find task status for requestId: ${requestId}`);
+                next(Error(`Couldn't find task status for requestId: ${requestId}`));
             }
         } catch (err) {
             next(err);

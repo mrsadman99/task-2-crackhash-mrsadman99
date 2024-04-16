@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getWorker } from '../worker.js';
+import { Worker } from 'worker_threads';
 
 type CreateTaskRequest = {
     requestId: string;
@@ -14,7 +14,16 @@ export default (updateTaskStatusUrl: string) => (req: Request<null, string | nul
     } else {
         const { requestId, hash, maxLength } = body;
 
-        getWorker().execute(updateTaskStatusUrl, 1, 1, requestId, hash, maxLength);
+        new Worker('./worker.js', {
+            workerData: {
+                updateTaskStatusUrl,
+                partNumber: 1,
+                partCount: 1,
+                requestId,
+                hash,
+                maxLength,
+            },
+        });
 
         res.sendStatus(200);
     }
