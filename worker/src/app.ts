@@ -22,4 +22,3 @@ workerApi
     .post(createTaskPath, createTask(updateTaskStatusUrl))
     .use(errorHandler)
     .listen(Number(WORKER_PORT!), () => { });
-

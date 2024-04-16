@@ -32,7 +32,6 @@ const loggerConfig: log4js.Configuration = {
     },
 };
 const loggerManager = log4js.configure(loggerConfig);
-
 const logger = loggerManager.getLogger();
 
 export { loggerManager, logger };

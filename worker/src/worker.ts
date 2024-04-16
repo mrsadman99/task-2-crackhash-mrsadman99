@@ -64,7 +64,6 @@ class Worker implements IWorker {
             // Writes log message about iterated to next words length
             if (nextWordsLength) {
                 const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
-                
                 taskLogger.info(logMessage);
             }
 
