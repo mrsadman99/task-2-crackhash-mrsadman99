@@ -1,27 +1,25 @@
-networks:
-  external-net:
-  internal-net:
-
 services:
   manager:
     build:
       context: ../
-      dockerfile: ./manager/Dockerfile
+      dockerfile: manager-dockerfile
     networks:
       - external-net
       - internal-net
     volumes:
-      - /manager/logs
+      - manager_logs:/manager/logs
+
   worker:
     build:
       context: ../
-      dockerfile: ./worker/Dockerfile
+      dockerfile: worker-dockerfile
     networks:
       - internal-net
     volumes:
       - /worker/logs
+
   nginx:
-    image: nginx:1.25.4
+    image: nginx:1.25
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -30,3 +28,89 @@ services:
       - 3000:3000
     networks:
       - external-net
+
+  mongo1:
+    container_name: mongo1
+    image: mongo:7.0
+    command: ["--replSet", "mongod_repl", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27017:27017
+    networks:
+      mongo-cluster:
+        ipv4_address: 111.222.32.2
+    healthcheck:
+      test: echo "rs.status()" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 60s
+      start_period: 10s
+      start_interval: 5s
+      retries: 5
+    volumes:
+      - "mongo1_data:/data/db"
+      - "mongo1_config:/data/configdb"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  mongo2:
+    image: mongo:7.0
+    container_name: mongo2
+    command: ["--replSet", "mongod_repl", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27017:27017
+    networks:
+      mongo-cluster:
+        ipv4_address: 111.222.32.3
+    healthcheck:
+      test: echo "rs.status()" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 60s
+      start_period: 10s
+      start_interval: 5s
+      retries: 5
+    volumes:
+      - "mongo2_data:/data/db"
+      - "mongo2_config:/data/configdb"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  mongo3:
+    image: mongo:7.0
+    container_name: mongo3
+    command: ["--replSet", "mongod_repl", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27017:27017
+    networks:
+      mongo-cluster:
+        ipv4_address: 111.222.32.4
+    healthcheck:
+      test: echo "rs.status()" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 60s
+      start_period: 10s
+      start_interval: 5s
+      retries: 5
+    volumes:
+      - "mongo3_data:/data/db"
+      - "mongo3_config:/data/configdb"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+volumes:
+  manager_logs:
+  mongo1_data:
+  mongo2_data:
+  mongo3_data:
+  mongo1_config:
+  mongo2_config:
+  mongo3_config:
+
+networks:
+  external-net:
+  internal-net:
+  mongo-cluster:
+    ipam:
+      config:
+        - subnet: 111.222.32.0/24
