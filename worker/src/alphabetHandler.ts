@@ -1,7 +1,6 @@
 type WordsByLength = { [key: number]: number };
 type WordsGeneratorType = { word: string; nextWordsLength: boolean };
 
-
 const getAlphabet = (): string[] => {
     const latinSymbolsOffset = 97;
     const latinAlphabetCount = 26;
@@ -56,7 +55,8 @@ class AlphabetHandler {
     private nextWord(): WordsGeneratorType {
         let nextWordsLength = false;
         // Retrieves word symbol which will change to next alphabet symbol
-        let index = this.currentWordByAlphabetArray.findIndex(alphabetIndex => alphabetIndex + 1 < this.alphabet.length);
+        let index = this.currentWordByAlphabetArray
+            .findIndex(alphabetIndex => alphabetIndex + 1 < this.alphabet.length);
 
         if (index === -1) {
             index = this.currentWordByAlphabetArray.length;
@@ -82,9 +82,7 @@ class AlphabetHandler {
     private getWordsCountByLength(maxLength: number): WordsByLength {
         const alphabetCount = this.alphabet.length;
         // Amount of words in combination from 1 to i length words, where i is key of map
-        const wordsCountByLength: WordsByLength = {
-            1: alphabetCount,
-        };
+        const wordsCountByLength: WordsByLength = { 1: alphabetCount };
         for (let i = 2; i <= maxLength; i++) {
             wordsCountByLength[i] = wordsCountByLength[i - 1] + Math.pow(alphabetCount, i);
         }
@@ -98,7 +96,12 @@ class AlphabetHandler {
     * @param {number} partCount amount of workers
     * @param {number} partNumber worker number
    */
-    private setStartedPosition(wordsCountByLength: WordsByLength, maxLength: number, partCount: number, partNumber: number) {
+    private setStartedPosition(
+        wordsCountByLength: WordsByLength,
+        maxLength: number,
+        partCount: number,
+        partNumber: number,
+    ) {
         const wordsCount = wordsCountByLength[maxLength];
         let wordsCountByWorker = Math.floor(wordsCount / partCount);
         if (partCount === partNumber) {

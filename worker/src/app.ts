@@ -5,20 +5,14 @@ import errorHandler from './middlewares/errorHandler.js';
 import express from 'express';
 import loggerHandler from './middlewares/loggerHandler.js';
 
-const {
-    WORKER_PORT,
-    INTERNAL_MANAGER_HOST,
-    INTERNAL_MANAGER_PORT,
-} = process.env;
-
+const { WORKER_PORT } = process.env;
 const createTaskPath = '/internal/api/worker/hash/crack/task';
-const updateTaskStatusUrl = `http://${INTERNAL_MANAGER_HOST}:${INTERNAL_MANAGER_PORT}/internal/api/manager/hash/crack/request`;
 
 const workerApi = express();
 
 workerApi
     .use(express.json())
     .use(loggerHandler)
-    .post(createTaskPath, createTask(updateTaskStatusUrl))
+    .post(createTaskPath, createTask)
     .use(errorHandler)
     .listen(Number(WORKER_PORT!), () => { });

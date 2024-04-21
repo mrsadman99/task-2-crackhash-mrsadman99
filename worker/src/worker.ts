@@ -50,7 +50,8 @@ class Worker implements IWorker {
         partCount: number,
         requestId: string,
         hash: string,
-        maxLength: number) {
+        maxLength: number,
+    ) {
         const taskMetadata = {
             requestId,
             hash,
@@ -94,7 +95,11 @@ class Worker implements IWorker {
         return alphabetIterator;
     }
 
-    protected async sendUpdatedStatus(updateTaskStatusUrl: string, requestId: string, data: string): Promise<boolean> {
+    protected async sendUpdatedStatus(
+        updateTaskStatusUrl: string,
+        requestId: string,
+        data: string,
+    ): Promise<boolean> {
         try {
             const result = await axios.patch(updateTaskStatusUrl, {
                 requestId,
@@ -107,4 +112,4 @@ class Worker implements IWorker {
     }
 }
 
-new Worker().execute().then((result) => parentPort?.postMessage({result}));
+new Worker().execute().then((result) => parentPort?.postMessage({ result }));

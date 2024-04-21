@@ -7,14 +7,17 @@ type CreateTaskRequest = {
     maxLength: number;
 };
 
-export default (createTaskWorkerUrl: string) => async (req: Request<null, CreateTaskResponse, CreateTaskRequest>, res: Response<CreateTaskResponse>, next: NextFunction) => {
+export default async (
+    req: Request<null, CreateTaskResponse, CreateTaskRequest>,
+    res: Response<CreateTaskResponse>, next: NextFunction,
+) => {
     const { body } = req;
     if (!body || !body.hash || !body.maxLength) {
         res.status(400).send('Invalid body format');
     } else {
         const { hash, maxLength } = body;
         try {
-            const createTaskResult = await getManager().createTask(createTaskWorkerUrl, hash, maxLength);
+            const createTaskResult = await getManager().createTask(hash, maxLength);
             if (!createTaskResult) {
                 next(Error(`Failed to post task: { hash: ${hash}, maxLength: ${maxLength}}`));
             } else {

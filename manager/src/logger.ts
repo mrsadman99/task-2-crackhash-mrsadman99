@@ -26,9 +26,15 @@ const loggerConfig: log4js.Configuration = {
     categories: {
         default: { appenders: ['common'], level: 'debug' },
         internalHttp: { appenders: ['internalHttp', 'common'], level: 'info' },
-        internalHttpErrors: { appenders: ['internalHttpErrors', 'internalHttp', 'common'], level: 'error' },
+        internalHttpErrors: {
+            appenders: ['internalHttpErrors', 'internalHttp', 'common'],
+            level: 'error',
+        },
         externalHttp: { appenders: ['externalHttp', 'common'], level: 'info' },
-        externalHttpErrors: { appenders: ['externalHttpErrors', 'externalHttp', 'common'], level: 'error' },
+        externalHttpErrors: {
+            appenders: ['externalHttpErrors', 'externalHttp', 'common'],
+            level: 'error', 
+        },
     },
 };
 const loggerManager = log4js.configure(loggerConfig);
