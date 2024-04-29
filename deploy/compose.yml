@@ -5,7 +5,7 @@ services:
       dockerfile: ./deploy/manager-dockerfile
     networks:
       - external-net
-      - internal-net
+      - rmq-net
       - db-net
     volumes:
       - manager_logs:/manager/logs
@@ -15,7 +15,7 @@ services:
       context: ../
       dockerfile: ./deploy/worker-dockerfile
     networks:
-      - internal-net
+      - rmq-net
     volumes:
       - /worker/logs
 
@@ -33,18 +33,16 @@ services:
       - external-net
 
   mongo1:
-    image: mongo:7.0
-    container_name: mongo1
-    command: ["--config", "etc/mongod.conf"]
+    build:
+      dockerfile: ./mongo-dockerfile
+      context: ./mongo
     networks:
       - db-net
     volumes:
-      - ./mongo/mongod.conf:/etc/mongod.conf
-      - ./mongo/mongo_keyfile:/etc/mongodb/pki/keyfile
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js
-      - ./mongo/initReplicas.js:/etc/mongo/initReplicas.js
+      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
+      - mongo1_config:/etc/mongodb
       - mongo1_data:/data/db
-      - mongo1_config:/data/configdb
+      - mongo1_configdb:/data/configdb
     env_file: ./.env
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
@@ -54,37 +52,35 @@ services:
       timeout: 60s
       interval: 5s
       retries: 10
-      test: "mongosh -u $MONGO_ROOT_USER -p $MONGO_ROOT_PASSWORD --quiet --eval 'load(\"/etc/mongo/initReplicas.js\")'"
+      test: "mongosh -u $MONGO_ROOT_USER -p $MONGO_ROOT_PASSWORD --quiet --eval 'load(\"/etc/mongodb/initReplicas.js\")'"
 
   mongo2:
-    image: mongo:7.0
-    container_name: mongo2
-    command: ["--config", "etc/mongod.conf"]
+    build:
+      dockerfile: ./mongo-dockerfile
+      context: ./mongo
     networks:
       - db-net
     volumes:
-      - ./mongo/mongod.conf:/etc/mongod.conf
-      - ./mongo/mongo_keyfile:/etc/mongodb/pki/keyfile
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js
+      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
+      - mongo2_config:/etc/mongodb
       - mongo2_data:/data/db
-      - mongo2_config:/data/configdb
+      - mongo2_configdb:/data/configdb
     env_file: ./.env
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
 
   mongo3:
-    image: mongo:7.0
-    container_name: mongo3
-    command: ["--config", "etc/mongod.conf"]
+    build:
+      dockerfile: ./mongo-dockerfile
+      context: ./mongo
     networks:
       - db-net
     volumes:
-      - ./mongo/mongod.conf:/etc/mongod.conf
-      - ./mongo/mongo_keyfile:/etc/mongodb/pki/keyfile
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js
+      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
+      - mongo3_config:/etc/mongodb
       - mongo3_data:/data/db
-      - mongo3_config:/data/configdb
+      - mongo3_configdb:/data/configdb
     env_file: ./.env
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
@@ -106,6 +102,16 @@ services:
       ME_CONFIG_MONGODB_URL: $MONGO_ROOT_CONNECT_URL
       ME_CONFIG_BASICAUTH: false
 
+  rmq:
+    image: rabbitmq:3.13
+    networks:
+      - rmq-net
+    env_file: ./.env
+    volumes:
+      -  ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rmq_logs:/var/log/rabbitmq
+      - rmq_state:/var/lib/rabbitmq
+
 volumes:
   manager_logs:
   mongo1_data:
@@ -114,8 +120,13 @@ volumes:
   mongo1_config:
   mongo2_config:
   mongo3_config:
+  mongo1_configdb:
+  mongo2_configdb:
+  mongo3_configdb:
+  rmq_logs:
+  rmq_state:
 
 networks:
   external-net:
-  internal-net:
+  rmq-net:
   db-net:

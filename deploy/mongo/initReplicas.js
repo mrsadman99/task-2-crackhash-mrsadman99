@@ -1,6 +1,6 @@
 try {
     rs.status();
-} catch(err) {
+} catch {
     rs.initiate(
         {
             _id: 'mongodb_set',

@@ -1,0 +1,6 @@
+FROM mongo:7.0
+COPY --chmod=600 --chown=999:999 ./mongo_keyfile /etc/mongodb/pki/keyfile
+COPY ./initReplicas.js /etc/mongodb/initReplicas.js
+COPY ./mongod.conf /etc/mongodb/mongod.conf
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["mongod", "--config", "/etc/mongodb/mongod.conf"]
