@@ -17,7 +17,7 @@ export default async (
     } else {
         const { hash, maxLength } = body;
         try {
-            const createTaskResult = await getManager().createTask(hash, maxLength);
+            const createTaskResult = await (await getManager()).createTask(hash, maxLength);
             if (!createTaskResult) {
                 next(Error(`Failed to post task: { hash: ${hash}, maxLength: ${maxLength}}`));
             } else {

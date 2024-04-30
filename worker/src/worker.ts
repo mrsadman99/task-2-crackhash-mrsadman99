@@ -1,11 +1,16 @@
 import { AlphabetHandler, WordsGeneratorType } from './alphabetHandler.js';
 import { parentPort, workerData } from 'worker_threads';
-import axios from 'axios';
 import { createHash } from 'crypto';
-import { taskLogger } from './logger.js';
+import { errorLogger, taskLogger } from './logger.js';
 
+/**
+ * @param partNumber worker number
+ * @param partCount amount of parts which will execute by workers
+ * @param requestId Task ID
+ * @param hash MD5 hash encoded word
+ * @param maxLength maximum amount of symbols in encoded word
+ */
 type WorkerDataType = {
-    updateTaskStatusUrl: string;
     partNumber: number;
     partCount: number;
     requestId: string;
@@ -15,53 +20,25 @@ type WorkerDataType = {
 const workerTypedData: WorkerDataType = workerData;
 
 interface IWorker {
-    execute(): Promise<boolean>;
+    crackHash(): void;
 }
 
 class Worker implements IWorker {
     /**
      * Executes iterating over words pool to find encoded word
-     * @param updateTaskStatusUrl URL to update task status
-     * @param partNumber worker number
-     * @param partCount amount of parts which will execute by workers
-     * @param requestId Task ID
-     * @param hash MD5 hash encoded word
-     * @param maxLength maximum amount of symbols in encoded word
      */
-    execute(): Promise<boolean> {
+    async crackHash(): Promise<string | null> {
         const {
-            updateTaskStatusUrl,
             partNumber,
             partCount,
             requestId,
             hash,
             maxLength,
         } = workerTypedData;
-        const data = this.crackHash(partNumber, partCount, requestId, hash, maxLength);
 
-        if (data) {
-            return this.sendUpdatedStatus(updateTaskStatusUrl, requestId, data);
-        }
-        return Promise.resolve(false);
-    }
+        const wordsGenerator = this.createTask(partCount, partNumber, maxLength, workerTypedData);
 
-    protected crackHash(
-        partNumber: number,
-        partCount: number,
-        requestId: string,
-        hash: string,
-        maxLength: number,
-    ) {
-        const taskMetadata = {
-            requestId,
-            hash,
-            maxLength,
-            partCount,
-            partNumber,
-        };
-        const wordsGenerator = this.createTask(partCount, partNumber, maxLength, taskMetadata);
-
-        for (const { word, nextWordsLength } of wordsGenerator) {
+        const iterate = (word: string, nextWordsLength: boolean) => {
             // Writes log message about iterated to next words length
             if (nextWordsLength) {
                 const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
@@ -76,14 +53,31 @@ class Worker implements IWorker {
 
                 return word;
             }
+
+            return null;
+        };
+
+        try {
+            for await (const { word, nextWordsLength } of wordsGenerator) {
+                const data = await new Promise<string | null>((resolve) => {
+                    setTimeout(() => resolve(iterate(word, nextWordsLength)), 0);
+                });
+                if (data) {
+                    return data;
+                }
+            }
+        } catch(err) {
+            errorLogger.error(err);
         }
+
+        return null;
     }
 
     protected createTask(
         partNumber: number,
         partCount: number, maxLength: number,
         taskMetadata: { requestId: string },
-    ): Generator<WordsGeneratorType> {
+    ): AsyncGenerator<WordsGeneratorType> {
         // Creates object in async way
         const alphabetHandler = new AlphabetHandler(maxLength, partCount, partNumber);
         const alphabetIterator = alphabetHandler.getWordsIterator();
@@ -94,22 +88,8 @@ class Worker implements IWorker {
 
         return alphabetIterator;
     }
-
-    protected async sendUpdatedStatus(
-        updateTaskStatusUrl: string,
-        requestId: string,
-        data: string,
-    ): Promise<boolean> {
-        try {
-            const result = await axios.patch(updateTaskStatusUrl, {
-                requestId,
-                data,
-            });
-            return result.status === 200;
-        } catch {
-            return false;
-        }
-    }
 }
 
-new Worker().execute().then((result) => parentPort?.postMessage({ result }));
+new Worker().crackHash().then(result => {
+    parentPort?.postMessage(result);
+});

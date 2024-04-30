@@ -34,11 +34,11 @@ class AlphabetHandler {
     /**
      * function generator which iterate over alphabet array and build words
      */
-    *getWordsIterator(): Generator<WordsGeneratorType> {
+    async *getWordsIterator(): AsyncGenerator<WordsGeneratorType> {
         yield { word: this.buildCurrentWord(), nextWordsLength: false };
 
         for (let wordIndex = 1; wordIndex < this.wordsCount; wordIndex++) {
-            yield this.nextWord();
+            yield await this.nextWord();
         }
     }
 
@@ -52,25 +52,27 @@ class AlphabetHandler {
             .join('');
     }
 
-    private nextWord(): WordsGeneratorType {
-        let nextWordsLength = false;
-        // Retrieves word symbol which will change to next alphabet symbol
-        let index = this.currentWordByAlphabetArray
-            .findIndex(alphabetIndex => alphabetIndex + 1 < this.alphabet.length);
+    private nextWord(): Promise<WordsGeneratorType> {
+        return new Promise((resolve) => {
+            let nextWordsLength = false;
+            // Retrieves word symbol which will change to next alphabet symbol
+            let index = this.currentWordByAlphabetArray
+                .findIndex(alphabetIndex => alphabetIndex + 1 < this.alphabet.length);
 
-        if (index === -1) {
-            index = this.currentWordByAlphabetArray.length;
-            this.currentWordByAlphabetArray.push(0);
-            nextWordsLength = true;
-        } else {
-            this.currentWordByAlphabetArray[index]++;
-        }
-        // sets 0 index of alphabet symbol to all word letters right from letter with position {index}
-        for (let zeroAlphabetIndex = 0; zeroAlphabetIndex < index; zeroAlphabetIndex++) {
-            this.currentWordByAlphabetArray[zeroAlphabetIndex] = 0;
-        }
+            if (index === -1) {
+                index = this.currentWordByAlphabetArray.length;
+                this.currentWordByAlphabetArray.push(0);
+                nextWordsLength = true;
+            } else {
+                this.currentWordByAlphabetArray[index]++;
+            }
+            // sets 0 index of alphabet symbol to all word letters right from letter with position {index}
+            for (let zeroAlphabetIndex = 0; zeroAlphabetIndex < index; zeroAlphabetIndex++) {
+                this.currentWordByAlphabetArray[zeroAlphabetIndex] = 0;
+            }
 
-        return { word: this.buildCurrentWord(), nextWordsLength };
+            resolve({ word: this.buildCurrentWord(), nextWordsLength });
+        });
     }
 
     /**

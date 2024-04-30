@@ -1,13 +1,7 @@
-import axios, { AxiosResponse } from 'axios';
+import { getTasksEmitter, ITasksEmitter } from './tasksEmitter.js';
 import type { IRepository, TaskData, TaskState } from './repositories/types.d.ts';
 import { getRepository as getTaskRepository } from './repositories/TaskRepository.js';
 import { v4 as uuid } from 'uuid';
-
-const {
-    INTERNAL_WORKER_HOST,
-    WORKER_PORT,
-} = process.env;
-const CREATE_TASK_WORKER_URL = `http://${INTERNAL_WORKER_HOST}:${WORKER_PORT}/internal/api/worker/hash/crack/task`;
 
 // Sets task timout to 10 mins
 const TASK_TIMEOUT = 10 * 60 * 1000;
@@ -17,12 +11,21 @@ type CreateTaskStatus = { result: 'CREATE' | 'EXIST' };
 interface IManager {
     createTask(hash: string, maxLength: number): Promise<TaskState & CreateTaskStatus | null>;
     getTaskStatus(requestId: string): Promise<TaskData | null>;
-    saveTaskResult(requestId: string, word: string): Promise<boolean>;
+    init(): Promise<void>;
 }
 
 class Manager implements IManager {
     private tasksTimeout: { [requestId: string]: NodeJS.Timeout } = {};
     protected taskRepository: IRepository<TaskState> = getTaskRepository();
+    protected tasksEmitter: ITasksEmitter = getTasksEmitter();
+
+    async init(): Promise<void> {
+        await this.tasksEmitter.init();
+        await this.tasksEmitter.consumeResult(async (result: object) => {
+            const { requestId, word } = result as { requestId: string; word: string };
+            await this.saveTaskResult(requestId, word);
+        });
+    }
 
     async createTask(
         hash: string,
@@ -30,20 +33,13 @@ class Manager implements IManager {
     ): Promise<TaskState & CreateTaskStatus | null> {
         const requestId = uuid();
 
+        // Checks if task was started earlier
         const existingTask = await this.getExistingTask(hash);
         if (existingTask) {
             return { ...existingTask, result: 'EXIST' };
         }
 
-        const result = await this.sendTaskToWorker(
-            CREATE_TASK_WORKER_URL,
-            requestId,
-            hash,
-            maxLength,
-        );
-        if (!result) {
-            return null;
-        }
+        // Inserts task into database
         const taskState: TaskState = {
             requestId,
             hash,
@@ -51,17 +47,25 @@ class Manager implements IManager {
             maxLength,
             data: null,
         };
-
-        // Exits from function if task state not inserted into db
         if (!await this.taskRepository.insertOne(taskState)) {
             return null;
         }
-        // Sets timeouts for error status task in database
+
+        // Sets timeout for error status task in database
         this.tasksTimeout[requestId] = setTimeout(() => this.updateTask(
             requestId,
             { status: 'ERROR' },
         ), TASK_TIMEOUT);
 
+        // Sends task to worker
+        const result = await this.sendTaskToWorker(
+            requestId,
+            hash,
+            maxLength,
+        );
+        if (!result) {
+            return null;
+        }
 
         return { ...taskState, result: 'CREATE' };
     }
@@ -76,7 +80,7 @@ class Manager implements IManager {
         return { data, status };
     }
 
-    async saveTaskResult(requestId: string, word: string): Promise<boolean> {
+    protected async saveTaskResult(requestId: string, word: string): Promise<boolean> {
         const isUpdated = await this.updateTask(requestId, { data: word, status: 'READY' });
         if (isUpdated) {
             clearTimeout(this.tasksTimeout[requestId]);
@@ -87,7 +91,10 @@ class Manager implements IManager {
     }
 
     protected async updateTask(requestId: string, taskState: Partial<TaskState>): Promise<boolean> {
-        const updateStatus = await this.taskRepository.updateOne({ requestId }, taskState);
+        const updateStatus = await this.taskRepository.updateOne(
+            { requestId },
+            { $set: taskState },
+        );
 
         return updateStatus !== null;
     }
@@ -106,32 +113,36 @@ class Manager implements IManager {
     }
 
     protected async sendTaskToWorker(
-        createTaskWorkerUrl: string,
         requestId: string,
         hash: string,
         maxLength: number,
     ): Promise<boolean> {
-        // Sends request to worker
-        let result: AxiosResponse | null = null;
+        const workersCount = await this.tasksEmitter.getConsumersCount();
+
         try {
-            result = await axios.post(createTaskWorkerUrl, {
-                requestId,
-                hash,
-                maxLength,
-            });
+            // Sends request to workers
+            for (let partNumber = 1; partNumber <= workersCount; partNumber++) {
+                this.tasksEmitter.emitTask({
+                    requestId,
+                    hash,
+                    maxLength,
+                    partNumber,
+                    partCount: workersCount,
+                }, TASK_TIMEOUT);
+            }
+            return true;
         } catch (err) {
             return false;
         }
-
-        return result?.status === 200;
     }
 }
 
 let manager: IManager | null = null;
 
-const getManager = (): IManager => {
+const getManager = async (): Promise<IManager> => {
     if (!manager) {
         manager = new Manager();
+        await manager.init();
     }
     return manager;
 };

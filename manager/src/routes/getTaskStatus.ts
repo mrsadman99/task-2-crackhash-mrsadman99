@@ -11,7 +11,7 @@ export default async (
         res.status(400).send('Invalid requestId format');
     } else {
         try {
-            taskStatus = await getManager().getTaskStatus(requestId);
+            taskStatus = await (await getManager()).getTaskStatus(requestId);
             if (!taskStatus) {
                 next(Error(`Couldn't find task status for requestId: ${requestId}`));
             }

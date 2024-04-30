@@ -1,5 +1,8 @@
 services:
   manager:
+    depends_on:
+      rmq:
+        condition: service_healthy
     build:
       context: ../
       dockerfile: ./deploy/manager-dockerfile
@@ -9,15 +12,33 @@ services:
       - db-net
     volumes:
       - manager_logs:/manager/logs
+      - manager_deps:/manager/node_modules
 
-  worker:
+  worker1:
+    depends_on:
+      rmq:
+        condition: service_healthy
     build:
       context: ../
       dockerfile: ./deploy/worker-dockerfile
     networks:
       - rmq-net
     volumes:
-      - /worker/logs
+      - worker1_logs:/worker/logs
+      - worker1_deps:/worker/node_modules
+
+  worker2:
+    depends_on:
+      rmq:
+        condition: service_healthy
+    build:
+      context: ../
+      dockerfile: ./deploy/worker-dockerfile
+    networks:
+      - rmq-net
+    volumes:
+      - worker2_logs:/worker/logs
+      - worker2_deps:/worker/node_modules
 
   nginx:
     image: nginx:1.25
@@ -39,7 +60,6 @@ services:
     networks:
       - db-net
     volumes:
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
       - mongo1_config:/etc/mongodb
       - mongo1_data:/data/db
       - mongo1_configdb:/data/configdb
@@ -47,6 +67,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: $MONGO_DB_NAME
     healthcheck:
       start_period: 10s
       timeout: 60s
@@ -61,7 +82,6 @@ services:
     networks:
       - db-net
     volumes:
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
       - mongo2_config:/etc/mongodb
       - mongo2_data:/data/db
       - mongo2_configdb:/data/configdb
@@ -69,6 +89,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: $MONGO_DB_NAME
 
   mongo3:
     build:
@@ -77,7 +98,6 @@ services:
     networks:
       - db-net
     volumes:
-      - ./mongo/initMongo.js:/docker-entrypoint-initdb.d/initMongo.js:ro
       - mongo3_config:/etc/mongodb
       - mongo3_data:/data/db
       - mongo3_configdb:/data/configdb
@@ -85,6 +105,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+      MONGO_INITDB_DATABASE: $MONGO_DB_NAME
 
   mongo-ui:
     image: mongo-express:1.0.2
@@ -111,9 +132,22 @@ services:
       -  ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - rmq_logs:/var/log/rabbitmq
       - rmq_state:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 30s
+      retries: 3
+    expose:
+      - 5672
+      - 15672
 
 volumes:
+  manager_deps:
   manager_logs:
+  worker1_deps:
+  worker1_logs:
+  worker2_deps:
+  worker2_logs:
   mongo1_data:
   mongo2_data:
   mongo3_data:

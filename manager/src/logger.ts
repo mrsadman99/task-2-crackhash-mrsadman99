@@ -6,13 +6,9 @@ const loggerConfig: log4js.Configuration = {
             type: 'file',
             filename: './logs/manager.log',
         },
-        internalHttpErrors: {
+        commonErrors: {
             type: 'file',
-            filename: './logs/internal-http-error.log',
-        },
-        internalHttp: {
-            type: 'file',
-            filename: './logs/internal-http.log',
+            filename: './logs/manager-error .log',
         },
         externalHttpErrors: {
             type: 'file',
@@ -25,15 +21,10 @@ const loggerConfig: log4js.Configuration = {
     },
     categories: {
         default: { appenders: ['common'], level: 'debug' },
-        internalHttp: { appenders: ['internalHttp', 'common'], level: 'info' },
-        internalHttpErrors: {
-            appenders: ['internalHttpErrors', 'internalHttp', 'common'],
-            level: 'error',
-        },
-        externalHttp: { appenders: ['externalHttp', 'common'], level: 'info' },
+        externalHttp: { appenders: ['externalHttp'], level: 'info' },
         externalHttpErrors: {
-            appenders: ['externalHttpErrors', 'externalHttp', 'common'],
-            level: 'error', 
+            appenders: ['externalHttpErrors', 'externalHttp'],
+            level: 'error',
         },
     },
 };

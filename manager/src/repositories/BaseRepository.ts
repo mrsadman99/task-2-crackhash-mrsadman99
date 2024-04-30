@@ -40,7 +40,7 @@ class BaseRepository<T extends Document> implements IRepository<T> {
         try {
             const result = (await this.getCollection()).insertOne(data);
             return result;
-        }  catch {
+        } catch {
             return null;
         }
     }

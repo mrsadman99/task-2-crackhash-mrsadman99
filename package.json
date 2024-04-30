@@ -7,6 +7,6 @@
     "typescript-eslint": "^7.6.0"
   },
   "scripts": {
-    "postinstall": "(cd worker && npm i) && (cd ../manager && npm i)"
+    "postinstall": "(cd worker && npm i) && (cd manager && npm i)"
   }
 }
