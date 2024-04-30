@@ -1,6 +1,8 @@
 services:
   manager:
     depends_on:
+      mongo1:
+        condition: service_healthy
       rmq:
         condition: service_healthy
     build:
@@ -39,6 +41,32 @@ services:
     volumes:
       - worker2_logs:/worker/logs
       - worker2_deps:/worker/node_modules
+
+  worker3:
+    depends_on:
+      rmq:
+        condition: service_healthy
+    build:
+      context: ../
+      dockerfile: ./deploy/worker-dockerfile
+    networks:
+      - rmq-net
+    volumes:
+      - worker3_logs:/worker/logs
+      - worker3_deps:/worker/node_modules
+
+  worker4:
+    depends_on:
+      rmq:
+        condition: service_healthy
+    build:
+      context: ../
+      dockerfile: ./deploy/worker-dockerfile
+    networks:
+      - rmq-net
+    volumes:
+      - worker4_logs:/worker/logs
+      - worker4_deps:/worker/node_modules
 
   nginx:
     image: nginx:1.25
@@ -128,18 +156,22 @@ services:
     networks:
       - rmq-net
     env_file: ./.env
+    environment:
+      - RABBITMQ_ENABLED_PLUGINS_FILE=/etc/rabbitmq/plugins.conf
     volumes:
-      -  ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rmq/rmq_plugins.conf:/etc/rabbitmq/plugins.conf:ro
+      - ./rmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - rmq_logs:/var/log/rabbitmq
       - rmq_state:/var/lib/rabbitmq
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 10s
-      timeout: 30s
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 30s
+      timeout: 10s
       retries: 3
+    ports:
+      - 15672:15672
     expose:
       - 5672
-      - 15672
 
 volumes:
   manager_deps:
@@ -148,6 +180,10 @@ volumes:
   worker1_logs:
   worker2_deps:
   worker2_logs:
+  worker3_deps:
+  worker3_logs:
+  worker4_deps:
+  worker4_logs:
   mongo1_data:
   mongo2_data:
   mongo3_data:

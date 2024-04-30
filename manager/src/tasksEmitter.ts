@@ -1,4 +1,4 @@
-import { Channel, connect, Connection, ConsumeMessage, Replies } from 'amqplib';
+import { Channel, connect, Connection, ConsumeMessage } from 'amqplib';
 import { logger } from './logger.js';
 
 interface ITasksEmitter {
@@ -29,8 +29,11 @@ class TasksEmiter implements ITasksEmitter {
     }
 
     async getConsumersCount(): Promise<number> {
-        return (await this.channel.assertQueue(this.tasksEmitQueue, { durable: true }))
-            .consumerCount;
+        try {
+            return (await this.channel.checkQueue(this.tasksEmitQueue)).consumerCount;
+        } catch {
+            return 0;
+        }
     }
 
     async consumeResult(resultCallback: (result: object) => Promise<void>): Promise<void> {

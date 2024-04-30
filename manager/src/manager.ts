@@ -118,16 +118,17 @@ class Manager implements IManager {
         maxLength: number,
     ): Promise<boolean> {
         const workersCount = await this.tasksEmitter.getConsumersCount();
-
+        const partCount = workersCount > 0 ? workersCount : 1;
+        
         try {
             // Sends request to workers
-            for (let partNumber = 1; partNumber <= workersCount; partNumber++) {
+            for (let partNumber = 1; partNumber <= partCount; partNumber++) {
                 this.tasksEmitter.emitTask({
                     requestId,
                     hash,
                     maxLength,
                     partNumber,
-                    partCount: workersCount,
+                    partCount,
                 }, TASK_TIMEOUT);
             }
             return true;

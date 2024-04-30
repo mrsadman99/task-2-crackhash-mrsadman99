@@ -36,28 +36,39 @@ class Worker implements IWorker {
             maxLength,
         } = workerTypedData;
 
-        const wordsGenerator = this.createTask(partCount, partNumber, maxLength, workerTypedData);
-
-        const iterate = (word: string, nextWordsLength: boolean) => {
-            // Writes log message about iterated to next words length
-            if (nextWordsLength) {
-                const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
-                taskLogger.info(logMessage);
-            }
-
-            const currentHash = createHash('md5').update(word).digest('hex');
-
-            if (currentHash === hash) {
-                const logMessage = `${requestId} Task completed, word: ${word}`;
-                taskLogger.info(logMessage);
-
-                return word;
-            }
-
-            return null;
-        };
-
         try {
+            const wordsGenerator = this.createTask(
+                partCount,
+                partNumber, 
+                maxLength,
+                workerTypedData,
+            );
+            let currentWord = '';
+
+            const iterate = (word: string, nextWordsLength: boolean) => {
+                currentWord = word;
+                // Writes log message about iterated to next words length
+                if (nextWordsLength) {
+                    const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
+                    taskLogger.info(logMessage);
+                }
+
+                const currentHash = createHash('md5').update(word).digest('hex');
+
+                if (currentHash === hash) {
+                    const logMessage = `${requestId} Task completed, word: ${word}`;
+                    taskLogger.info(logMessage);
+
+                    return word;
+                }
+
+                return null;
+            };
+
+            setInterval(() => {
+                taskLogger.info(`${requestId} task current computation word: ${currentWord}`);
+            }, Number(process.env['LOG_TASK_INTERVAL']!));
+
             for await (const { word, nextWordsLength } of wordsGenerator) {
                 const data = await new Promise<string | null>((resolve) => {
                     setTimeout(() => resolve(iterate(word, nextWordsLength)), 0);
@@ -66,7 +77,7 @@ class Worker implements IWorker {
                     return data;
                 }
             }
-        } catch(err) {
+        } catch (err) {
             errorLogger.error(err);
         }
 
@@ -74,15 +85,15 @@ class Worker implements IWorker {
     }
 
     protected createTask(
+        partCount: number, 
         partNumber: number,
-        partCount: number, maxLength: number,
+        maxLength: number,
         taskMetadata: { requestId: string },
     ): AsyncGenerator<WordsGeneratorType> {
         // Creates object in async way
         const alphabetHandler = new AlphabetHandler(maxLength, partCount, partNumber);
         const alphabetIterator = alphabetHandler.getWordsIterator();
 
-        taskLogger.addContext('requestId', taskMetadata.requestId);
         const logMessage = `${taskMetadata.requestId} Created task with following parameters: ${JSON.stringify(taskMetadata, null, 2)}`;
         taskLogger.info(logMessage);
 

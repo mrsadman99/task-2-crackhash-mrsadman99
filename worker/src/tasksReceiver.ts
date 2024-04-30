@@ -26,16 +26,15 @@ class TasksReceiver implements ITasksReceiver {
     }
 
     async consumeEmit(emitCallback: (taskData: object) => Promise<object | null>): Promise<void> {
-        const consumeCallback = async (msg: ConsumeMessage | null) => {
+        const consumeCallback = (msg: ConsumeMessage | null) => {
             if (!msg) {
                 return;
             }
 
             const taskStringData = msg.content.toString();
             const taskData = JSON.parse(taskStringData);
-            try {
-                // Handles compute task
-                const result = await emitCallback(taskData);
+            // Handles compute task
+            emitCallback(taskData).then(result => {
                 if (!result) {
                     this.channel.nack(msg);
                     logger.info(`Message ${taskStringData} nacked.`);
@@ -43,14 +42,14 @@ class TasksReceiver implements ITasksReceiver {
                 }
                 this.channel.ack(msg);
                 logger.info(`Message ${taskStringData} succesfully acked.`);
-
+    
                 // Sends response to emitter
                 this.publishTaskResult(result);
-            } catch(err) {
+            }).catch(err => {
                 errorLogger.error(err);
                 this.channel.nack(msg);
                 errorLogger.error(`Message ${taskStringData} nacked, error: ${err}`);
-            }
+            });
 
         };
 

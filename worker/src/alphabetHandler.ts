@@ -35,7 +35,7 @@ class AlphabetHandler {
      * function generator which iterate over alphabet array and build words
      */
     async *getWordsIterator(): AsyncGenerator<WordsGeneratorType> {
-        yield { word: this.buildCurrentWord(), nextWordsLength: false };
+        yield { word: this.buildCurrentWord(), nextWordsLength: true };
 
         for (let wordIndex = 1; wordIndex < this.wordsCount; wordIndex++) {
             yield await this.nextWord();

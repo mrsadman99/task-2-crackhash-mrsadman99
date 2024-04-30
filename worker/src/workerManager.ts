@@ -1,4 +1,3 @@
-import { logger, taskLogger } from './logger.js';
 import { getTasksReceiver } from './tasksReceiver.js';
 import { Worker } from 'worker_threads';
 
