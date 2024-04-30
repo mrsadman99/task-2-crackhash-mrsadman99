@@ -1,16 +1,20 @@
-import { Channel, connect, Connection, ConsumeMessage } from 'amqplib';
+import { ConfirmChannel, connect, Connection, ConsumeMessage, Replies } from 'amqplib';
 import { errorLogger, logger } from './logger.js';
 
 interface ITasksEmitter {
     init(): Promise<void>;
     getConsumersCount(): Promise<number>;
     consumeResult(resultCallback: (result: object) => Promise<boolean>): Promise<void>;
-    emitTask(taskData: object, expirationLimit: number): boolean;
+    emitTask(
+        taskData: object,
+        expirationLimit: number,
+        confirmCallback: (err: unknown, _: Replies.Empty) => Promise<void>
+    ): boolean;
 }
 
 class TasksEmiter implements ITasksEmitter {
     private _connection: Connection | null = null;
-    private _channel: Channel | null = null;
+    private _channel: ConfirmChannel | null = null;
 
     private directExchange: string = process.env['RMQ_DIRECT_EXCHANGE']!;
     private fanoutExchange: string = process.env['RMQ_FANOUT_EXCHANGE']!;
@@ -27,10 +31,10 @@ class TasksEmiter implements ITasksEmitter {
             this._connection = await connect(process.env['RMQ_CONNECT_URL']!);
             this._channel = await this.initChannel();
             this._channel.on('error', (error) => errorLogger.error(`RMQ channel error: ${error}`));
-            this._connection.on('error', (error) => errorLogger.error(`RMQ connection error: ${error}`));
+            this._connection?.on('error', (error) => errorLogger.error(`RMQ connection error: ${error}`));
 
             await this.initBindings();
-        } catch(err) {
+        } catch (err) {
             errorLogger.error(`Failed to init task emitter error: ${err}`);
         }
     }
@@ -62,10 +66,10 @@ class TasksEmiter implements ITasksEmitter {
                         Buffer.from(result.requestId),
                         { persistent: true },
                     );
-                    logger.info(`Task ${result.requestId} completes.`);
+                    logger.info(`Task ${result.requestId} completed.`);
                 }
 
-            } catch(err) {
+            } catch (err) {
                 errorLogger
                     .error(`Message from ${this.tasksResultConsumeQueue} nacked, error: ${err}`);
                 this.channel.nack(msg);
@@ -80,7 +84,11 @@ class TasksEmiter implements ITasksEmitter {
         );
     }
 
-    emitTask(taskData: object, expirationLimit: number): boolean {
+    emitTask(
+        taskData: object,
+        expirationLimit: number,
+        confirmCallback: (err: unknown, _: Replies.Empty) => Promise<void>,
+    ): boolean {
         const data = JSON.stringify(taskData);
 
         return this.channel.publish(
@@ -91,23 +99,24 @@ class TasksEmiter implements ITasksEmitter {
                 persistent: true,
                 expiration: expirationLimit,
             },
+            confirmCallback,
         );
     }
 
-    protected async initChannel(): Promise<Channel> {
+    protected async initChannel(): Promise<ConfirmChannel> {
         if (!this._connection) {
             throw Error('Connection to message broker unavailable now.');
         }
 
-        const channel = await this._connection.createChannel();
+        const channel = await this._connection.createConfirmChannel();
         channel.prefetch(1);
 
         return channel;
     }
 
-    protected get channel(): Channel {
+    protected get channel(): ConfirmChannel {
         if (!this._channel) {
-            throw Error('Channel not initialized yet.');
+            throw Error('ConfirmChannel not initialized yet.');
         }
         return this._channel;
     }

@@ -8,7 +8,7 @@ import type {
     WithId,
 } from 'mongodb';
 
-type TaskStatus = 'IN_PROGRESS' | 'READY' | 'ERROR';
+type TaskStatus = 'IN_PROGRESS' | 'READY' | 'ERROR' | 'WAITING';
 type TaskData = {
     status: TaskStatus;
     data: string | null;
@@ -26,4 +26,4 @@ interface IRepository<T extends Document> {
     updateOne(filter: Filter<T>, data: UpdateFilter<T>): Promise<UpdateResult<T> | null>;
 }
 
-export { TaskState, TaskData, IRepository };
+export { TaskState, TaskData, TaskStatus, IRepository };

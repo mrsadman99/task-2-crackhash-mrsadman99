@@ -1,10 +1,12 @@
 import { getTasksEmitter, ITasksEmitter } from './tasksEmitter.js';
-import type { IRepository, TaskData, TaskState } from './repositories/types.d.ts';
+import type { IRepository, TaskData, TaskState, TaskStatus } from './repositories/types.d.ts';
 import { errorLogger } from './logger.js';
 import { getRepository as getTaskRepository } from './repositories/TaskRepository.js';
+import { Replies } from 'amqplib';
 import { v4 as uuid } from 'uuid';
 
-const TASK_TIMEOUT = 60 * 1000 * Number(process.env['TASK_TIMEOUT_MINS']);
+// Sets task timout to 10 mins
+const TASK_TIMEOUT = 10 * 60 * 1000;
 
 type CreateTaskStatus = { result: 'CREATE' | 'EXIST' };
 
@@ -20,15 +22,11 @@ class Manager implements IManager {
     protected tasksEmitter: ITasksEmitter = getTasksEmitter();
 
     async init(): Promise<void> {
-        try {
-            await this.tasksEmitter.init();
-            await this.tasksEmitter.consumeResult((result: object): Promise<boolean> => {
-                const { requestId, word } = result as { requestId: string; word: string };
-                return this.saveTaskResult(requestId, word);
-            });
-        }catch(err) {
-            errorLogger.error(`Failed to init task emitter error: ${err}`);
-        }
+        await this.tasksEmitter.init();
+        await this.tasksEmitter.consumeResult((result: object) => {
+            const { requestId, word } = result as { requestId: string; word: string };
+            return this.saveTaskResult(requestId, word);
+        });
     }
 
     async createTask(
@@ -42,36 +40,19 @@ class Manager implements IManager {
         if (existingTask) {
             return { ...existingTask, result: 'EXIST' };
         }
-
-        // Inserts task into database
-        const taskState: TaskState = {
+        const taskMetadata = {
             requestId,
             hash,
-            status: 'IN_PROGRESS',
             maxLength,
-            data: null,
         };
-        if (!await this.taskRepository.insertOne(taskState)) {
-            return null;
-        }
-
-        // Sets timeout for error status task in database
-        this.tasksTimeout[requestId] = setTimeout(() => this.updateTask(
-            requestId,
-            { status: 'ERROR' },
-        ), TASK_TIMEOUT);
 
         // Sends task to worker
-        const result = await this.sendTaskToWorker(
-            requestId,
-            hash,
-            maxLength,
-        );
+        const result = await this.sendTaskToWorker(taskMetadata);
         if (!result) {
             return null;
         }
 
-        return { ...taskState, result: 'CREATE' };
+        return { ...result, result: 'CREATE' };
     }
 
     async getTaskStatus(requestId: string): Promise<TaskData | null> {
@@ -85,10 +66,6 @@ class Manager implements IManager {
     }
 
     protected async saveTaskResult(requestId: string, word: string): Promise<boolean> {
-        if (!word) {
-            return false;
-        }
-
         const isUpdated = await this.updateTask(requestId, { data: word, status: 'READY' });
         if (isUpdated) {
             clearTimeout(this.tasksTimeout[requestId]);
@@ -120,31 +97,56 @@ class Manager implements IManager {
         }
     }
 
-    protected async sendTaskToWorker(
-        requestId: string,
-        hash: string,
-        maxLength: number,
-    ): Promise<boolean> {
+    protected async sendTaskToWorker(taskMetadata: {
+        requestId: string;
+        hash: string;
+        maxLength: number;
+    }): Promise<TaskState | null> {
         const workersCount = await this.tasksEmitter.getConsumersCount();
         const partCount = workersCount > 0 ? workersCount : 1;
-        const taskMetadata = {
-            requestId,
-            hash,
-            maxLength,
-            partCount,
-        };
-        let partNumber = 1;
+        
+        return new Promise((resolve) => {
+            let status: TaskStatus = 'IN_PROGRESS';
+            let confirmedCount = 0;
 
-        try {
-            // Sends request to workers
-            for (; partNumber <= partCount; partNumber++) {
-                this.tasksEmitter.emitTask({ ...taskMetadata, partNumber }, TASK_TIMEOUT);
+            const confirmCallback = async (err: unknown, _: Replies.Empty): Promise<void> => {
+                if (err) {
+                    errorLogger.error(`Failed to push task ${JSON.stringify(taskMetadata, null, 2)}`);
+                    status = 'WAITING';
+                }
+                confirmedCount++;
+
+                // Manipulates with database only when handle all publishing messages
+                if (confirmedCount !== workersCount) {
+                    return;
+                }
+
+                const tmpTaskState = { ...taskMetadata, data: null, status };
+                if (await this.taskRepository.insertOne(tmpTaskState)) {
+                    // Sets timeout for error status task in database
+                    this.tasksTimeout[taskMetadata.requestId] = setTimeout(() => this.updateTask(
+                        taskMetadata.requestId,
+                        { status: 'ERROR' },
+                    ), TASK_TIMEOUT);
+        
+                    resolve(tmpTaskState);
+                }
+                resolve(null);
+            };
+
+            try {
+                // Sends request to workers
+                for (let partNumber = 1; partNumber <= partCount; partNumber++) {
+                    this.tasksEmitter.emitTask({
+                        ...taskMetadata,
+                        partNumber,
+                        partCount,
+                    }, TASK_TIMEOUT, confirmCallback);
+                }
+            } catch (err) {
+                resolve(null);
             }
-            return true;
-        } catch (err) {
-            errorLogger.error(`Failed to post task ${{ ...taskMetadata, partNumber }}`);
-            return false;
-        }
+        });
     }
 }
 
