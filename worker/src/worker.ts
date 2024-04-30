@@ -1,7 +1,7 @@
-import { AlphabetHandler, WordsGeneratorType } from './alphabetHandler.js';
+import { errorLogger, logger, taskLogger } from './logger.js';
 import { parentPort, workerData } from 'worker_threads';
+import { AlphabetHandler } from './alphabetHandler.js';
 import { createHash } from 'crypto';
-import { errorLogger, taskLogger } from './logger.js';
 
 /**
  * @param partNumber worker number
@@ -23,6 +23,10 @@ interface IWorker {
     crackHash(): void;
 }
 
+const LOG_TASK_INTERVAL = Number(process.env['LOG_TASK_INTERVAL_SECS']) * 1000;
+
+let timer: NodeJS.Timeout;
+
 class Worker implements IWorker {
     /**
      * Executes iterating over words pool to find encoded word
@@ -37,16 +41,15 @@ class Worker implements IWorker {
         } = workerTypedData;
 
         try {
-            const wordsGenerator = this.createTask(
+            const alphabetHandler = this.createTask(
                 partCount,
-                partNumber, 
+                partNumber,
                 maxLength,
                 workerTypedData,
             );
-            let currentWord = '';
+            const wordsGenerator = alphabetHandler.getWordsIterator();
 
             const iterate = (word: string, nextWordsLength: boolean) => {
-                currentWord = word;
                 // Writes log message about iterated to next words length
                 if (nextWordsLength) {
                     const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
@@ -65,9 +68,10 @@ class Worker implements IWorker {
                 return null;
             };
 
-            setInterval(() => {
-                taskLogger.info(`${requestId} task current computation word: ${currentWord}`);
-            }, Number(process.env['LOG_TASK_INTERVAL']!));
+            timer = setInterval(
+                () => taskLogger.info(`${requestId} task current state: ${JSON.stringify(alphabetHandler.state, null, 2)}`),
+                LOG_TASK_INTERVAL,
+            );
 
             for await (const { word, nextWordsLength } of wordsGenerator) {
                 const data = await new Promise<string | null>((resolve) => {
@@ -85,22 +89,31 @@ class Worker implements IWorker {
     }
 
     protected createTask(
-        partCount: number, 
+        partCount: number,
         partNumber: number,
         maxLength: number,
         taskMetadata: { requestId: string },
-    ): AsyncGenerator<WordsGeneratorType> {
+    ): AlphabetHandler {
         // Creates object in async way
         const alphabetHandler = new AlphabetHandler(maxLength, partCount, partNumber);
-        const alphabetIterator = alphabetHandler.getWordsIterator();
+        const taskParams = { partNumber, partCount, ...alphabetHandler.state };
 
-        const logMessage = `${taskMetadata.requestId} Created task with following parameters: ${JSON.stringify(taskMetadata, null, 2)}`;
-        taskLogger.info(logMessage);
+        taskLogger.info(`${taskMetadata.requestId} Created task with following parameters: ${JSON.stringify(taskParams, null, 2)}`);
 
-        return alphabetIterator;
+        return alphabetHandler;
     }
 }
 
+// Stops worker if exit message posted from main
+parentPort?.on('message', (msg) => {
+    if (msg.exit && msg.requestId) {
+        logger.info(`Stop task ${msg.requestId}`);
+        clearTimeout(timer);
+        process.exit(0);
+    }
+});
+
 new Worker().crackHash().then(result => {
+    clearTimeout(timer);
     parentPort?.postMessage(result);
 });

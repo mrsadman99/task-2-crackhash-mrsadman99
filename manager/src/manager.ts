@@ -1,10 +1,10 @@
 import { getTasksEmitter, ITasksEmitter } from './tasksEmitter.js';
 import type { IRepository, TaskData, TaskState } from './repositories/types.d.ts';
+import { errorLogger } from './logger.js';
 import { getRepository as getTaskRepository } from './repositories/TaskRepository.js';
 import { v4 as uuid } from 'uuid';
 
-// Sets task timout to 10 mins
-const TASK_TIMEOUT = 10 * 60 * 1000;
+const TASK_TIMEOUT = 60 * 1000 * Number(process.env['TASK_TIMEOUT_MINS']);
 
 type CreateTaskStatus = { result: 'CREATE' | 'EXIST' };
 
@@ -20,11 +20,15 @@ class Manager implements IManager {
     protected tasksEmitter: ITasksEmitter = getTasksEmitter();
 
     async init(): Promise<void> {
-        await this.tasksEmitter.init();
-        await this.tasksEmitter.consumeResult(async (result: object) => {
-            const { requestId, word } = result as { requestId: string; word: string };
-            await this.saveTaskResult(requestId, word);
-        });
+        try {
+            await this.tasksEmitter.init();
+            await this.tasksEmitter.consumeResult((result: object): Promise<boolean> => {
+                const { requestId, word } = result as { requestId: string; word: string };
+                return this.saveTaskResult(requestId, word);
+            });
+        }catch(err) {
+            errorLogger.error(`Failed to init task emitter error: ${err}`);
+        }
     }
 
     async createTask(
@@ -81,6 +85,10 @@ class Manager implements IManager {
     }
 
     protected async saveTaskResult(requestId: string, word: string): Promise<boolean> {
+        if (!word) {
+            return false;
+        }
+
         const isUpdated = await this.updateTask(requestId, { data: word, status: 'READY' });
         if (isUpdated) {
             clearTimeout(this.tasksTimeout[requestId]);
@@ -119,20 +127,22 @@ class Manager implements IManager {
     ): Promise<boolean> {
         const workersCount = await this.tasksEmitter.getConsumersCount();
         const partCount = workersCount > 0 ? workersCount : 1;
-        
+        const taskMetadata = {
+            requestId,
+            hash,
+            maxLength,
+            partCount,
+        };
+        let partNumber = 1;
+
         try {
             // Sends request to workers
-            for (let partNumber = 1; partNumber <= partCount; partNumber++) {
-                this.tasksEmitter.emitTask({
-                    requestId,
-                    hash,
-                    maxLength,
-                    partNumber,
-                    partCount,
-                }, TASK_TIMEOUT);
+            for (; partNumber <= partCount; partNumber++) {
+                this.tasksEmitter.emitTask({ ...taskMetadata, partNumber }, TASK_TIMEOUT);
             }
             return true;
         } catch (err) {
+            errorLogger.error(`Failed to post task ${{ ...taskMetadata, partNumber }}`);
             return false;
         }
     }

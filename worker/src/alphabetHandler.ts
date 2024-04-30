@@ -20,15 +20,26 @@ class AlphabetHandler {
     protected alphabet: string[];
     protected wordsCount: number = 0;
     protected currentWordByAlphabetArray: number[] = [];
+    protected currentWord = '';
+    protected maxLength: number;
 
     constructor(
         maxLength: number,
         partCount: number,
         partNumber: number,
     ) {
+        this.maxLength = maxLength;
         this.alphabet = getAlphabet();
         const wordsCountByLength = this.getWordsCountByLength(maxLength);
         this.setStartedPosition(wordsCountByLength, maxLength, partCount, partNumber);
+    }
+
+    get state() {
+        return {
+            currentWord: this.currentWord,
+            wordsCount: this.wordsCount,
+            maxLength: this.maxLength,
+        };
     }
 
     /**
@@ -46,10 +57,12 @@ class AlphabetHandler {
      * Reverses array of symbols to correct way from left to right and build current word
      * */
     buildCurrentWord() {
-        return Array.from(this.currentWordByAlphabetArray)
+        this.currentWord = Array.from(this.currentWordByAlphabetArray)
             .reverse()
             .map(alphabetIndex => this.alphabet[alphabetIndex])
             .join('');
+
+        return this.currentWord;
     }
 
     private nextWord(): Promise<WordsGeneratorType> {

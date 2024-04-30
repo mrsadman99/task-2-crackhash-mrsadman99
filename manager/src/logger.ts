@@ -8,7 +8,7 @@ const loggerConfig: log4js.Configuration = {
         },
         commonErrors: {
             type: 'file',
-            filename: './logs/manager-error .log',
+            filename: './logs/manager-error.log',
         },
         externalHttpErrors: {
             type: 'file',
@@ -21,6 +21,7 @@ const loggerConfig: log4js.Configuration = {
     },
     categories: {
         default: { appenders: ['common'], level: 'debug' },
+        commonErrors: { appenders: ['commonErrors', 'common'], level: 'error' },
         externalHttp: { appenders: ['externalHttp'], level: 'info' },
         externalHttpErrors: {
             appenders: ['externalHttpErrors', 'externalHttp'],
@@ -30,5 +31,6 @@ const loggerConfig: log4js.Configuration = {
 };
 const loggerManager = log4js.configure(loggerConfig);
 const logger = loggerManager.getLogger();
+const errorLogger = loggerManager.getLogger('commonErrors');
 
-export { loggerManager, logger };
+export { loggerManager, logger, errorLogger };
