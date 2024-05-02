@@ -6,6 +6,10 @@ const loggerConfig: log4js.Configuration = {
             type: 'file',
             filename: './logs/manager.log',
         },
+        db: {
+            type: 'file',
+            filename: './logs/db.log',
+        },
         commonErrors: {
             type: 'file',
             filename: './logs/manager-error.log',
@@ -22,6 +26,7 @@ const loggerConfig: log4js.Configuration = {
     categories: {
         default: { appenders: ['common'], level: 'debug' },
         commonErrors: { appenders: ['commonErrors', 'common'], level: 'error' },
+        db: { appenders: ['db'], level: 'debug' },
         externalHttp: { appenders: ['externalHttp'], level: 'info' },
         externalHttpErrors: {
             appenders: ['externalHttpErrors', 'externalHttp'],
@@ -32,5 +37,6 @@ const loggerConfig: log4js.Configuration = {
 const loggerManager = log4js.configure(loggerConfig);
 const logger = loggerManager.getLogger();
 const errorLogger = loggerManager.getLogger('commonErrors');
+const dbLoger = loggerManager.getLogger('db');
 
-export { loggerManager, logger, errorLogger };
+export { loggerManager, logger, errorLogger, dbLoger };

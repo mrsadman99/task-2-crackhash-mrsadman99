@@ -1,19 +1,17 @@
-import { getTasksReceiver } from './tasksReceiver.js';
+import { logger } from './logger.js';
+import { TasksReceiver } from './tasksReceiver.js';
 import { Worker } from 'worker_threads';
 
-interface IWorkerManager {
-    init(): Promise<void>;
-}
 
-class WorkerManager implements IWorkerManager {
-    protected tasksReceiver = getTasksReceiver();
-    protected activeWorkers: { [requestId: string]: Worker } = {};
-
-    async init(): Promise<void> {
-        await this.tasksReceiver.init();
-        await this.tasksReceiver.consumeEmit(this.handleWorkerState);
+class WorkerManager {
+    protected init = async (): Promise<void> => {
+        await this.tasksReceiver.consumeEmit(this.handleWorkerState, this.handleStopTask);
         await this.tasksReceiver.consumeStopTask(this.handleStopTask);
-    }
+
+        logger.info('Succesfully initialized worker manager');
+    };
+    protected tasksReceiver = new TasksReceiver(this.init);
+    protected activeWorkers: { [requestId: string]: Worker } = {};
 
     protected handleWorkerState = async (workerData: object): Promise<object | null> => {
         const typedData = workerData as {
@@ -48,7 +46,8 @@ class WorkerManager implements IWorkerManager {
         return { word: data, requestId: typedData.requestId };
     };
 
-    protected handleStopTask = (requestId: string) => {
+    protected handleStopTask = (data: { requestId: string }) => {
+        const { requestId } = data;
         if (requestId in this.activeWorkers) {
             const activeWorker = this.activeWorkers[requestId];
             activeWorker.postMessage({ exit: true, requestId });
@@ -56,12 +55,5 @@ class WorkerManager implements IWorkerManager {
     };
 }
 
-let workerManager: IWorkerManager;
-const getWorkerManager = () => {
-    if (!workerManager) {
-        workerManager = new WorkerManager();
-    }
-    return workerManager;
-};
 
-export { IWorkerManager, getWorkerManager };
+export { WorkerManager };

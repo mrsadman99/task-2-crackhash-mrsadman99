@@ -1,7 +1,7 @@
+import { createHash, randomUUID } from 'crypto';
 import { errorLogger, logger, taskLogger } from './logger.js';
 import { parentPort, workerData } from 'worker_threads';
 import { AlphabetHandler } from './alphabetHandler.js';
-import { createHash } from 'crypto';
 
 /**
  * @param partNumber worker number
@@ -41,7 +41,7 @@ class Worker implements IWorker {
         } = workerTypedData;
 
         try {
-            const alphabetHandler = this.createTask(
+            const { alphabetHandler, taskId } = this.createTask(
                 partCount,
                 partNumber,
                 maxLength,
@@ -52,14 +52,14 @@ class Worker implements IWorker {
             const iterate = (word: string, nextWordsLength: boolean) => {
                 // Writes log message about iterated to next words length
                 if (nextWordsLength) {
-                    const logMessage = `${requestId} Iterated to next words length: ${word.length}`;
+                    const logMessage = `${taskId} iterated to next words length: ${word.length}`;
                     taskLogger.info(logMessage);
                 }
 
                 const currentHash = createHash('md5').update(word).digest('hex');
 
                 if (currentHash === hash) {
-                    const logMessage = `${requestId} Task completed, word: ${word}`;
+                    const logMessage = `${taskId} completed, word: ${word}`;
                     taskLogger.info(logMessage);
 
                     return word;
@@ -69,7 +69,7 @@ class Worker implements IWorker {
             };
 
             timer = setInterval(
-                () => taskLogger.info(`${requestId} task current state: ${JSON.stringify(alphabetHandler.state, null, 2)}`),
+                () => taskLogger.info(`${taskId} current state: ${JSON.stringify({ ...alphabetHandler.state, requestId }, null, 2)}`),
                 LOG_TASK_INTERVAL,
             );
 
@@ -81,11 +81,13 @@ class Worker implements IWorker {
                     return data;
                 }
             }
+            taskLogger.info(`${taskId} completed without data.`);
+
+            return null;
         } catch (err) {
             errorLogger.error(err);
+            return null;
         }
-
-        return null;
     }
 
     protected createTask(
@@ -93,14 +95,20 @@ class Worker implements IWorker {
         partNumber: number,
         maxLength: number,
         taskMetadata: { requestId: string },
-    ): AlphabetHandler {
+    ): { taskId: string; alphabetHandler: AlphabetHandler } {
         // Creates object in async way
         const alphabetHandler = new AlphabetHandler(maxLength, partCount, partNumber);
-        const taskParams = { partNumber, partCount, ...alphabetHandler.state };
+        const taskParams = {
+            partNumber,
+            partCount,
+            requestId: taskMetadata.requestId,
+            ...alphabetHandler.state,
+        };
+        const taskId = randomUUID();
 
-        taskLogger.info(`${taskMetadata.requestId} Created task with following parameters: ${JSON.stringify(taskParams, null, 2)}`);
+        taskLogger.info(`${taskId} created with following parameters: ${JSON.stringify(taskParams, null, 2)}`);
 
-        return alphabetHandler;
+        return { taskId, alphabetHandler };
     }
 }
 

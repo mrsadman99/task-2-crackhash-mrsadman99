@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { getManager } from '../manager.js';
+import { IManager } from '../manager.js';
 
 type CreateTaskResponse = { requestId: string } | string;
 type CreateTaskRequest = {
@@ -7,7 +7,7 @@ type CreateTaskRequest = {
     maxLength: number;
 };
 
-export default async (
+export default (manager: IManager) => async (
     req: Request<null, CreateTaskResponse, CreateTaskRequest>,
     res: Response<CreateTaskResponse>, next: NextFunction,
 ) => {
@@ -17,7 +17,7 @@ export default async (
     } else {
         const { hash, maxLength } = body;
         try {
-            const createTaskResult = await (await getManager()).createTask(hash, maxLength);
+            const createTaskResult = await manager.createTask(hash, maxLength);
             if (!createTaskResult) {
                 next(Error(`Failed to post task: { hash: ${hash}, maxLength: ${maxLength}}`));
             } else {

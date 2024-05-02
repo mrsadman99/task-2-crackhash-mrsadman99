@@ -22,6 +22,7 @@ class AlphabetHandler {
     protected currentWordByAlphabetArray: number[] = [];
     protected currentWord = '';
     protected maxLength: number;
+    protected currentWordNumber = 0;
 
     constructor(
         maxLength: number,
@@ -39,6 +40,7 @@ class AlphabetHandler {
             currentWord: this.currentWord,
             wordsCount: this.wordsCount,
             maxLength: this.maxLength,
+            currentWordNumber: this.currentWordNumber,
         };
     }
 
@@ -47,9 +49,12 @@ class AlphabetHandler {
      */
     async *getWordsIterator(): AsyncGenerator<WordsGeneratorType> {
         yield { word: this.buildCurrentWord(), nextWordsLength: true };
+        this.currentWordNumber++;
 
         for (let wordIndex = 1; wordIndex < this.wordsCount; wordIndex++) {
-            yield await this.nextWord();
+            const iteratedWord = await this.nextWord();
+            this.currentWordNumber++;
+            yield iteratedWord;
         }
     }
 
