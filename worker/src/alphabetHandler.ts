@@ -1,5 +1,4 @@
 type WordsByLength = { [key: number]: number };
-type WordsGeneratorType = { word: string; nextWordsLength: boolean };
 
 const getAlphabet = (): string[] => {
     const latinSymbolsOffset = 97;
@@ -47,8 +46,8 @@ class AlphabetHandler {
     /**
      * function generator which iterate over alphabet array and build words
      */
-    async *getWordsIterator(): AsyncGenerator<WordsGeneratorType> {
-        yield { word: this.buildCurrentWord(), nextWordsLength: true };
+    async *getWordsIterator(): AsyncGenerator<string> {
+        yield this.buildCurrentWord();
         this.currentWordNumber++;
 
         for (let wordIndex = 1; wordIndex < this.wordsCount; wordIndex++) {
@@ -70,9 +69,8 @@ class AlphabetHandler {
         return this.currentWord;
     }
 
-    private nextWord(): Promise<WordsGeneratorType> {
+    private nextWord(): Promise<string> {
         return new Promise((resolve) => {
-            let nextWordsLength = false;
             // Retrieves word symbol which will change to next alphabet symbol
             let index = this.currentWordByAlphabetArray
                 .findIndex(alphabetIndex => alphabetIndex + 1 < this.alphabet.length);
@@ -80,7 +78,6 @@ class AlphabetHandler {
             if (index === -1) {
                 index = this.currentWordByAlphabetArray.length;
                 this.currentWordByAlphabetArray.push(0);
-                nextWordsLength = true;
             } else {
                 this.currentWordByAlphabetArray[index]++;
             }
@@ -89,7 +86,7 @@ class AlphabetHandler {
                 this.currentWordByAlphabetArray[zeroAlphabetIndex] = 0;
             }
 
-            resolve({ word: this.buildCurrentWord(), nextWordsLength });
+            resolve(this.buildCurrentWord());
         });
     }
 
@@ -160,4 +157,4 @@ class AlphabetHandler {
 
 }
 
-export { WordsGeneratorType, AlphabetHandler };
+export { AlphabetHandler };

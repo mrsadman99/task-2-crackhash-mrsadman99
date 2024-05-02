@@ -173,7 +173,7 @@ class Manager implements IManager {
                 }
                 // Manipulates with database only when handle all publishing messages
                 // or task exists in Database and have status waiting
-                if (confirmedCount !== workersCount || (existsInDB && status === 'WAITING')) {
+                if (confirmedCount !== partCount || (existsInDB && status === 'WAITING')) {
                     return;
                 }
 

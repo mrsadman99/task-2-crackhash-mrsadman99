@@ -49,6 +49,8 @@ class TasksEmiter implements ITasksEmitter {
                 if (emitQueueResults) {
                     this._consumersCount = emitQueueResults.consumerCount;
                     await this.initBindings();
+        
+                    logger.info(`Heartbeat tasks emitter consumers count ${this._consumersCount}`);
                     return 'ALIVE';
                 }
             } catch (err) {

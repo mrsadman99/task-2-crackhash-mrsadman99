@@ -49,13 +49,7 @@ class Worker implements IWorker {
             );
             const wordsGenerator = alphabetHandler.getWordsIterator();
 
-            const iterate = (word: string, nextWordsLength: boolean) => {
-                // Writes log message about iterated to next words length
-                if (nextWordsLength) {
-                    const logMessage = `${taskId} iterated to next words length: ${word.length}`;
-                    taskLogger.info(logMessage);
-                }
-
+            const iterate = (word: string) => {
                 const currentHash = createHash('md5').update(word).digest('hex');
 
                 if (currentHash === hash) {
@@ -73,9 +67,9 @@ class Worker implements IWorker {
                 LOG_TASK_INTERVAL,
             );
 
-            for await (const { word, nextWordsLength } of wordsGenerator) {
+            for await (const word of wordsGenerator) {
                 const data = await new Promise<string | null>((resolve) => {
-                    setTimeout(() => resolve(iterate(word, nextWordsLength)), 0);
+                    setTimeout(() => resolve(iterate(word)), 0);
                 });
                 if (data) {
                     return data;

@@ -6,7 +6,7 @@ import express from 'express';
 import { getManager } from './manager.js';
 import getTaskStatus from './routes/getTaskStatus.js';
 import loggerHandler from './middlewares/loggerHandler.js';
-import { loggerManager } from './logger.js';
+import { logger, loggerManager } from './logger.js';
 
 const { EXTERNAL_MANAGER_PORT } = process.env;
 
@@ -23,4 +23,6 @@ externalHttp
     .get(GET_STATUS_TASK_PATH, getTaskStatus(manager))
     .use(errorHandler(loggerManager.getLogger('externalHttpErrors')));
 
-externalHttp.listen(Number(EXTERNAL_MANAGER_PORT!), () => { });
+externalHttp.listen(Number(EXTERNAL_MANAGER_PORT!), () => { 
+    logger.info('Succesfully init manager web server');
+});

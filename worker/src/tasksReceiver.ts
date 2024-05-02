@@ -39,6 +39,7 @@ class TasksReceiver implements ITasksReceiver {
             try {
                 if (await this._channel?.checkQueue(this.tasksEmitConsumeQueue)) {
                     await this.initBindings();
+                    logger.info('Heartbeat tasks receiver');
                     return 'ALIVE';
                 }
             } catch (err) {
